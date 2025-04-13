@@ -1,0 +1,6 @@
+[submodule "rebased"]
+	path = rebased
+	url = https://github.com/ManoloZocco/rebased.git
+[submodule "soapbox"]
+	path = soapbox
+	url = https://github.com/ManoloZocco/soapbox.git
