@@ -923,7 +923,7 @@ defmodule Pleroma.Web.Router do
 
     get("/custom_emojis", CustomEmojiController, :index)
 
-    get("/trends", MastodonAPIController, :empty_array)
+    get("/trends", TrendsController, :index)
 
     get("/timelines/public", TimelineController, :public)
     get("/timelines/tag/:tag", TimelineController, :hashtag)

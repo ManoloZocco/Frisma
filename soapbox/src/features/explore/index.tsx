@@ -15,6 +15,7 @@ import SearchResults from 'soapbox/features/compose/components/search-results.ts
 import Search from 'soapbox/features/compose/components/search.tsx';
 import ExploreCards from 'soapbox/features/explore/components/explore-cards.tsx';
 import ExploreFilter from 'soapbox/features/explore/components/exploreFilter.tsx';
+import TrendsView from 'soapbox/features/explore/components/trends-view.tsx';
 import AccountsCarousel from 'soapbox/features/explore/components/popular-accounts.tsx';
 import { useSearchTokens } from 'soapbox/features/explore/useSearchTokens.ts';
 import { PublicTimeline } from 'soapbox/features/ui/util/async-components.ts';
@@ -60,7 +61,7 @@ const PostsTab = () => {
 const TrendsTab = () => {
   return (
     <Stack>
-      <SearchResults />
+      <TrendsView />
     </Stack>
   );
 };

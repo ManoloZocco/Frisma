@@ -42,97 +42,74 @@ defmodule Pleroma.Application do
 
   # See http://elixir-lang.org/docs/stable/elixir/Application.html
   # for more information on OTP Applications
-  def start(_type, _args) do
-    # Scrubbers are compiled at runtime and therefore will cause a conflict
-    # every time the application is restarted, so we disable module
-    # conflicts at runtime
-    Code.compiler_options(ignore_module_conflict: true)
-    # Disable warnings_as_errors at runtime, it breaks Phoenix live reload
-    # due to protocol consolidation warnings
-    Code.compiler_options(warnings_as_errors: false)
-    Pleroma.Telemetry.Logger.attach()
-    Config.Holder.save_default()
+  def start(_, _) do
+    Pleroma.Config.Holder.save_default()
     Pleroma.HTML.compile_scrubbers()
-    Pleroma.Config.Oban.warn()
-    Config.DeprecationWarnings.warn()
-    Pleroma.Web.Plugs.HTTPSecurityPlug.warn_if_disabled()
+    Pleroma.Config.DeprecationWarnings.warn()
+    Pleroma.Plugs.HTTPSecurityPlug.warn_if_disabled()
     Pleroma.ApplicationRequirements.verify!()
     setup_instrumenters()
-    load_custom_modules()
-    Pleroma.Docs.JSON.compile()
-    limiters_setup()
+    hack_ex_aws()
 
-    adapter = Application.get_env(:tesla, :adapter)
-
-    if match?({Tesla.Adapter.Finch, _}, adapter) do
-      Logger.info("Starting Finch")
-      Finch.start_link(name: MyFinch)
-    end
-
-    if adapter == Tesla.Adapter.Gun do
-      if version = Pleroma.OTPVersion.version() do
-        [major, minor] =
-          version
-          |> String.split(".")
-          |> Enum.map(&String.to_integer/1)
-          |> Enum.take(2)
-
-        if (major == 22 and minor < 2) or major < 22 do
-          raise "
-            !!!OTP VERSION WARNING!!!
-            You are using gun adapter with OTP version #{version}, which doesn't support correct handling of unordered certificates chains. Please update your Erlang/OTP to at least 22.2.
-            "
-        end
-      else
-        raise "
-          !!!OTP VERSION WARNING!!!
-          To support correct handling of unordered certificates chains - OTP version must be > 22.2.
-          "
-      end
-    end
-
-    # Define workers and child supervisors to be supervised
     children =
       [
-        Pleroma.PromEx,
         Pleroma.Repo,
-        Config.TransferTask,
         Pleroma.Emoji,
-        Pleroma.Web.Plugs.RateLimiter.Supervisor,
+        Pleroma.Config.TransferTask,
+        Pleroma.Web.Plugs.HTTPSecurityPlug.CachingPlug.child_spec(),
+        Pleroma.Stats,
+        {Oban, Application.fetch_env!(:pleroma, Oban)},
         {Task.Supervisor, name: Pleroma.TaskSupervisor}
       ] ++
         cachex_children() ++
-        http_children(adapter, @mix_env) ++
+        task_children() ++
         [
-          Pleroma.Stats,
-          Pleroma.JobQueueMonitor,
-          {Majic.Pool, [name: Pleroma.MajicPool, pool_size: Config.get([:majic_pool, :size], 2)]},
-          {Oban, Config.get(Oban)},
           Pleroma.Web.Endpoint,
-          TzWorld.Backend.DetsWithIndexCache
+          Pleroma.Gopher.Server,
+          {Majic.Pool, [name: Pleroma.MajicPool, size: Config.get([:majic_pool, :size], 2)]},
+          {Registry, keys: :unique, name: Pleroma.Web.Streamer.registry()},
+          {Pleroma.Web.Streamer.registry(), []},
+          Pleroma.BrandingReducer
         ] ++
-        task_children(@mix_env) ++
-        dont_run_in_test(@mix_env) ++
-        [Pleroma.Gopher.Server]
+        streamer_children() ++
+        oauth_storage_children() ++
+        [
+          {Pleroma.JobQueueMonitor, interval_s: 60}
+        ]
 
-    # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
+    # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
-    # If we have a lot of caches, default max_restarts can cause test
-    # resets to fail.
-    # Go for the default 3 unless we're in test
-    max_restarts =
-      if @mix_env == :test do
-        100
-      else
-        3
+    opts = [strategy: :one_for_one, name: Pleroma.Supervisor]
+    Supervisor.start_link(children, opts)
+    :telemetry.attach(
+      "web.uploaders.s3.client.on_s3_upload",
+      [:pleroma, :web, :s3_client, :upload, :stop],
+      &Pleroma.Web.Uploaders.S3Client.handle_upload_event/4,
+      nil
+    )
+
+    # Init background job for trending hashtags
+    if Pleroma.Config.get([:trends, :enabled], true) do
+      # Add initial entry to the Oban jobs
+      %{worker: Pleroma.Workers.TrendingHashtagsWorker}
+      |> Oban.Job.new(queue: :trending)
+      |> Oban.insert()
+    end
+
+    # Avvio del worker per il calcolo delle tendenze
+    if Pleroma.Config.get([:trends, :enabled], true) do
+      Oban.insert(
+        %{worker: Pleroma.Workers.TrendingHashtagsWorker},
+        queue: :trending
+      )
+      |> case do
+        {:ok, _} -> :ok
+        {:error, _} -> :error
       end
+    end
 
-    opts = [strategy: :one_for_one, name: Pleroma.Supervisor, max_restarts: max_restarts]
-    result = Supervisor.start_link(children, opts)
-
-    set_postgres_server_version()
-
-    result
+    Pleroma.Webhook.discover_enabled_webhooks()
+    Supervisor.start_link([], strategy: :one_for_one, name: Pleroma.Supervisor.AppendableSupervisor)
   end
 
   defp set_postgres_server_version do

@@ -118,4 +118,11 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPI do
   end
 
   defp restrict(query, _, _), do: query
+
+  defp masto_routes do
+    quote do
+      # Trends
+      get("/trends", TrendsController, :index)
+    end
+  end
 end

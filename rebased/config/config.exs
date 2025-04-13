@@ -610,7 +610,8 @@ config :pleroma, Oban,
     attachments_cleanup: 1,
     new_users_digest: 1,
     mute_expire: 5,
-    search_indexing: 10
+    search_indexing: 10,
+    trending: 1
   ],
   plugins: [Oban.Plugins.Pruner],
   crontab: [
@@ -953,6 +954,20 @@ config :pleroma, Pleroma.Search.Meilisearch,
   url: "http://127.0.0.1:7700/",
   private_key: nil,
   initial_indexing_chunk_size: 100_000
+
+config :pleroma, :trends,
+  enabled: true,
+  timeframe_hours: 24,
+  refresh_interval: :timer.minutes(30),
+  use_optimized_query: false,
+  persist_in_database: true,
+  limits: %{
+    hashtags: 10
+  }
+
+# Cache TTL per le tendenze (10 minuti)
+config :pleroma, :cache,
+  trends_ttl: :timer.minutes(10)
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
