@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta http-equiv="content-security-policy" content="<%- csp %>">
+    <link href="/manifest.webmanifest" rel="manifest">
+    <!--server-generated-meta-->
+    <script type="module" src="./src/main.tsx"></script>
+    <%- snippets %>
+  </head>
+  <body class="theme-mode-light no-reduce-motion">
+    <div id="soapbox" class="h-full">
+      <div class="h-screen w-screen flex justify-center items-center">
+        <div class="loading-indicator text-gray-50 text-xs uppercase flex flex-col justify-center overflow-visible h-screen w-screen items-center">
+          <div class="size-10 relative">
+            <div class="animate-loader-figure absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-12 rounded-full bg-transparent border-6 border-solid border-gray-200"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <noscript class="text-center">To use this website, please enable JavaScript.</noscript>
+  </body>
+</html>
