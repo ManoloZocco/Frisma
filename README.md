@@ -1,3 +1,3 @@
-# Frsma!
+# Frisma!
 
 Repository contenente i progetti rebased e soapbox come submoduli.
